@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>DormHub</title>
+<title>DormHub V2</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#eef2f7;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:520px;margin:auto;min-height:100vh;background:#f8fafc}
@@ -23,9 +23,11 @@ input,select,textarea{width:100%;padding:12px;border:1px solid #d1d5db;border-ra
 .login{min-height:100vh;display:flex;align-items:center;padding:25px 18px}.loginbox{width:100%}.notice{background:#eff6ff;color:#1e40af;padding:12px;border-radius:14px;font-size:13px;margin:12px 0}
 .empty{text-align:center;color:#6b7280;padding:25px}.dangerText{color:#b91c1c}.progress{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden}.progress>i{display:block;height:100%;background:#111827}
 hr{border:0;border-top:1px solid #eee;margin:12px 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 </style>
 </head>
-<body><div id="root"></div>
+<body>
+<div id="root"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://bpseqlkfsdpegapsxrwv.supabase.co";
@@ -42,12 +44,17 @@ const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random()
 function demoData(){
  const ids=["admin","u2","u3","u4","u5"];
  db.users=[
-  {id:"admin",name:"Сефул",room:"A",role:"admin"},{id:"u2",name:"User 2",room:"A",role:"member"},
-  {id:"u3",name:"User 3",room:"B",role:"member"},{id:"u4",name:"User 4",room:"B",role:"member"},{id:"u5",name:"User 5",room:"B",role:"member"}];
+  {id:"admin",name:"Сефул",room:"A",role:"admin"},
+  {id:"u2",name:"User 2",room:"A",role:"member"},
+  {id:"u3",name:"User 3",room:"B",role:"member"},
+  {id:"u4",name:"User 4",room:"B",role:"member"},
+  {id:"u5",name:"User 5",room:"B",role:"member"}
+ ];
  db.tasks=[
-  {id:uid(),title:"Вынести мусор",location:"Коридор / мусор",user_id:"admin",due_date:today(),points:1,status:"pending",icon:"🗑"},
-  {id:uid(),title:"Уборка туалета",location:"Туалет",user_id:"u3",due_date:today(),points:3,status:"done",icon:"🚽"},
-  {id:uid(),title:"Убрать коридор",location:"Коридор",user_id:"u4",due_date:today(),points:2,status:"pending",icon:"🧹"}];
+  {id:uid(),title:"Вынести мусор",location:"Коридор / мусор",user_id:"admin",created_by:"admin",due_date:today(),points:1,status:"pending",icon:"🗑"},
+  {id:uid(),title:"Уборка туалета",location:"Туалет",user_id:"u3",created_by:"admin",due_date:today(),points:3,status:"done",icon:"🚽"},
+  {id:uid(),title:"Убрать коридор",location:"Коридор",user_id:"u4",created_by:"u2",due_date:today(),points:2,status:"pending",icon:"🧹"}
+ ];
  db.problems=[{id:uid(),title:"Пример проблемы",location:"Раковина",description:"Это демонстрационная запись.",status:"new",reporter_id:"u4",created_at:new Date().toISOString()}];
  db.expenses=[{id:uid(),title:"Мусорные пакеты",amount:1200,user_id:"u2",user_name:"User 2",created_at:new Date().toISOString()}];
  db.inventory=[{id:uid(),name:"Туалетная бумага",quantity:6,unit:"рулонов",low_threshold:2},{id:uid(),name:"Мусорные пакеты",quantity:2,unit:"уп.",low_threshold:1}];
@@ -55,12 +62,14 @@ function demoData(){
  db.notifications=[];
  user={id:"admin"};profile=db.users[0];
 }
+
 async function init(){
  if(demo){demoData();render();return}
  const {data:{session}}=await sb.auth.getSession();
  if(session){user=session.user;await load();render()}else loginScreen();
  sb.auth.onAuthStateChange(async(_,s)=>{if(s){user=s.user;await load();render()}});
 }
+
 async function load(){
  const one=async table=>{const r=await sb.from(table).select("*");return r.data||[]};
  const p=await sb.from("profiles").select("*").eq("id",user.id).single();profile=p.data;
@@ -68,16 +77,19 @@ async function load(){
  let q=sb.from("task_assignments").select("*");if(profile.role!=="admin")q=q.eq("user_id",user.id);const tr=await q;db.tasks=tr.data||[];
  db.notifications=(await sb.from("notifications").select("*").eq("user_id",user.id).order("created_at",{ascending:false})).data||[];
 }
+
 function loginScreen(){
- $("root").innerHTML=`<div class="login"><div class="loginbox"><h1>🏠 DormHub</h1><p class="muted">Общие задачи вашей общаги</p>
+ $("root").innerHTML=`<div class="login"><div class="loginbox"><h1>🏠 DormHub V2</h1><p class="muted">Общие задачи вашей общаги</p>
  <div class="card"><label>Email</label><input id="email" type="email" placeholder="you@example.com"><label>Пароль</label><input id="password" type="password" placeholder="••••••••"><button class="btn" style="width:100%" onclick="login()">Войти</button></div>
  <div class="notice">Аккаунты создаются в Supabase Auth. После создания профиля Admin назначается через SQL.</div></div></div>`;
 }
+
 async function login(){const r=await sb.auth.signInWithPassword({email:$("email").value,password:$("password").value});if(r.error)alert(r.error.message)}
 async function logout(){if(demo){demoData();render();return}await sb.auth.signOut();location.reload()}
+
 function render(){
  const admin=profile?.role==="admin";
- $("root").innerHTML=`<div class="app"><header><div><h1>🏠 DormHub</h1><div class="small">${esc(profile?.name||"Пользователь")} · ${admin?"👑 Admin":"Member"}</div></div><button class="btn secondary" onclick="logout()">Выйти</button></header>
+ $("root").innerHTML=`<div class="app"><header><div><h1>🏠 DormHub V2</h1><div class="small">${esc(profile?.name||"Пользователь")} · ${admin?"👑 Admin":"Member"}</div></div><button class="btn secondary" onclick="logout()">Выйти</button></header>
  <main class="content" id="page"></main><nav class="nav">
  <button class="${page==="home"?"active":""}" onclick="go('home')">🏠<br>Главная</button>
  <button class="${page==="tasks"?"active":""}" onclick="go('tasks')">📋<br>Задачи</button>
@@ -87,39 +99,60 @@ function render(){
  </nav></div>`;
  draw();
 }
+
 function go(p){page=p;render()}
 function draw(){let e=$("page");if(page==="home")home(e);else if(page==="tasks")tasks(e);else if(page==="problems")problems(e);else if(page==="money")moneyPage(e);else if(page==="admin")admin(e);else more(e)}
 function empty(s){return `<div class="card empty">${s}</div>`}
+
 function taskCard(t,admin=false){
  const done=t.status==="done";
  const who=db.users.find(u=>u.id===t.user_id)?.name||"Неизвестно";
- return `<div class="card task"><div class="icon">${t.icon||"🧹"}</div><div class="task-main"><h3>${esc(t.title)}</h3><p>📍 ${esc(t.location||"Общая зона")}</p><p>📅 ${esc(t.due_date||"")} · ${t.points||1} балл(а)</p>${admin?`<p>👤 ${esc(who)}</p>`:""}</div><div>${done?`<span class="badge done">✓</span>`:`<button class="btn green" onclick="completeTask('${t.id}')">Готово</button>`}</div></div>`
+ const creator=db.users.find(u=>u.id===t.created_by)?.name||"—";
+ const canDelete = admin || t.created_by === user.id;
+ const canComplete = t.user_id === user.id || admin;
+
+ return `<div class="card task"><div class="icon">${t.icon||"🧹"}</div><div class="task-main"><h3>${esc(t.title)}</h3><p>📍 ${esc(t.location||"Общая зона")}</p><p>📅 ${esc(t.due_date||"")} · ${t.points||1} балл(а)</p><p>👤 Исполнитель: ${esc(who)}</p><p>🧑‍💻 Создал: ${esc(creator)}</p></div><div>${done?`<span class="badge done">✓</span>`:`<button class="btn green" onclick="completeTask('${t.id}')">Готово</button>`}</div></div>
+ ${canDelete?`<div class="actions"><button class="btn red" onclick="deleteTask('${t.id}')">Удалить</button></div>`:""}`
 }
+
 function home(e){
  const mine=db.tasks.filter(t=>t.user_id===user.id), open=mine.filter(t=>t.status!=="done").length, done=mine.filter(t=>t.status==="done").length;
  e.innerHTML=`<h2>Сегодня 👋</h2><div class="grid"><div class="stat"><b>${open}</b><span class="muted">активных задач</span></div><div class="stat"><b>${done}</b><span class="muted">выполнено</span></div></div>
  <h2 style="margin-top:22px">Мои задачи</h2>${mine.map(t=>taskCard(t)).join("")||empty("Задач нет 🎉")}
  <h2 style="margin-top:22px">📢 Объявления</h2>${db.announcements.slice().reverse().slice(0,3).map(a=>`<div class="card"><b>${esc(a.title)}</b><p>${esc(a.body)}</p><span class="muted">${esc((a.created_at||"").slice(0,10))}</span></div>`).join("")||empty("Нет объявлений")}`;
 }
+
 function tasks(e){
- const admin=profile.role==="admin";const list=admin?db.tasks:db.tasks.filter(t=>t.user_id===user.id);
- e.innerHTML=`<div class="row"><h2>📋 Задачи</h2>${admin?`<button class="btn" onclick="taskModal()">+ Задача</button>`:""}</div>${list.map(t=>taskCard(t,admin)).join("")||empty("Задач нет")}`;
+ const admin=profile.role==="admin";
+ const list=admin?db.tasks:db.tasks.filter(t=>t.user_id===user.id || t.created_by===user.id);
+ e.innerHTML=`<div class="row"><h2>📋 Задачи</h2><button class="btn" onclick="taskModal()">+ Задача</button></div>${list.map(t=>taskCard(t,admin)).join("")||empty("Задач нет")}`;
 }
+
 async function completeTask(id){
  if(demo){let t=db.tasks.find(x=>x.id===id);if(t)t.status="done";render();return}
- const r=await sb.from("task_assignments").update({status:"done",completed_at:new Date().toISOString()}).eq("id",id).eq("user_id",user.id);if(r.error)alert(r.error.message);else{await load();render()}
+ const r=await sb.from("task_assignments").update({status:"done",completed_at:new Date().toISOString()}).eq("id",id);if(r.error)alert(r.error.message);else{await load();render()}
 }
+
+async function deleteTask(id){
+ if(!confirm("Удалить задачу?")) return;
+ if(demo){db.tasks=db.tasks.filter(t=>t.id!==id);render();return}
+ const r=await sb.from("task_assignments").delete().eq("id",id);if(r.error)alert(r.error.message);else{await load();render()}
+}
+
 function problems(e){
  e.innerHTML=`<div class="row"><h2>🚨 Проблемы</h2><button class="btn" onclick="problemModal()">+ Сообщить</button></div>${db.problems.slice().reverse().map(p=>`<div class="card"><div class="row"><b>${esc(p.title)}</b><span class="badge ${p.status==="resolved"?"done":"warn"}">${p.status==="resolved"?"Решено":"В работе"}</span></div><p>${esc(p.description||"")}</p><p class="muted">📍 ${esc(p.location||"")} · ${esc((p.created_at||"").slice(0,10))}</p>${profile.role==="admin"&&p.status!=="resolved"?`<button class="btn green" onclick="resolveProblem('${p.id}')">✓ Решено</button>`:""}</div>`).join("")||empty("Проблем нет 🎉")}`;
 }
+
 async function resolveProblem(id){
  if(demo){let p=db.problems.find(x=>x.id===id);if(p)p.status="resolved";render();return}
  const r=await sb.from("problems").update({status:"resolved"}).eq("id",id);if(r.error)alert(r.error.message);else{await load();render()}
 }
+
 function moneyPage(e){
  const total=db.expenses.reduce((s,x)=>s+Number(x.amount||0),0),share=total/Math.max(db.users.length,1);
  e.innerHTML=`<div class="row"><h2>💰 Расходы</h2><button class="btn" onclick="expenseModal()">+ Расход</button></div><div class="grid"><div class="stat"><b>${money(total)}</b><span class="muted">всего</span></div><div class="stat"><b>${money(share)}</b><span class="muted">на человека</span></div></div>${db.expenses.slice().reverse().map(x=>`<div class="card"><div class="row"><b>${esc(x.title)}</b><b>${money(x.amount)}</b></div><p class="muted">👤 ${esc(x.user_name||"")} · ${(x.created_at||"").slice(0,10)}</p></div>`).join("")||empty("Расходов пока нет")}`;
 }
+
 function admin(e){
  const active=db.problems.filter(p=>p.status!=="resolved").length, total=db.expenses.reduce((s,x)=>s+Number(x.amount||0),0);
  e.innerHTML=`<h2>👑 Админ-панель</h2><div class="grid"><div class="stat"><b>${db.users.length}</b><span class="muted">жильцов</span></div><div class="stat"><b>${active}</b><span class="muted">проблем</span></div></div>
@@ -128,38 +161,60 @@ function admin(e){
  <div class="card"><h3>🧹 Управление</h3><button class="btn" onclick="taskModal()">+ Назначить задачу</button> <button class="btn secondary" onclick="announcementModal()">+ Объявление</button></div>
  <div class="card"><h3>💰 Всего расходов</h3><b>${money(total)}</b></div>`;
 }
+
 function more(e){
  e.innerHTML=`<h2>••• Ещё</h2><div class="card"><h3>📦 Запасы</h3>${db.inventory.map(x=>{let low=Number(x.quantity)<=Number(x.low_threshold);return `<div style="margin:13px 0"><div class="row"><b>${esc(x.name)}</b><span class="${low?"dangerText":""}">${x.quantity} ${esc(x.unit||"")}</span></div><div class="progress"><i style="width:${Math.min(100,Number(x.quantity)*15)}%"></i></div>${low?`<small class="dangerText">⚠️ Заканчивается</small>`:""}</div>`}).join("")||"Запасов нет"}</div>
  <div class="card"><h3>👤 Мой профиль</h3><p>Имя: ${esc(profile.name)}</p><p>Комната: ${esc(profile.room||"—")}</p><p>Роль: ${esc(profile.role)}</p></div>`;
 }
+
 function modal(inner){const m=document.createElement("div");m.className="modal show";m.innerHTML=`<div class="sheet">${inner}<br><button class="btn secondary" style="width:100%" onclick="this.closest('.modal').remove()">Отмена</button></div>`;document.body.appendChild(m)}
+
 function taskModal(){
- modal(`<h2>🧹 Новая задача</h2><label>Название</label><input id="tt" placeholder="Вынести мусор"><label>Место</label><select id="tl"><option>Коридор</option><option>Туалет</option><option>Раковина</option><option>Мусор</option></select><label>Исполнитель</label><select id="tu">${db.users.filter(u=>u.role!=="admin").map(u=>`<option value="${u.id}">${esc(u.name)} — ${esc(u.room)}</option>`).join("")}</select><label>Дата</label><input id="td" type="date" value="${today()}"><label>Баллы</label><input id="tp" type="number" min="1" max="10" value="1"><button class="btn" style="width:100%" onclick="createTask()">Создать</button>`);
+ modal(`<h2>🧹 Новая задача</h2><label>Название</label><input id="tt" placeholder="Вынести мусор"><label>Место</label><select id="tl"><option>Коридор</option><option>Туалет</option><option>Раковина</option><option>Мусор</option></select><label>Исполнитель</label><select id="tu">${db.users.map(u=>`<option value="${u.id}">${esc(u.name)} — ${esc(u.room)}${u.role==="admin"?" — 👑 Admin":""}</option>`).join("")}</select><label>Дата</label><input id="td" type="date" value="${today()}"><label>Баллы</label><input id="tp" type="number" min="1" max="10" value="1"><button class="btn" style="width:100%" onclick="createTask()">Создать</button>`);
 }
+
 async function createTask(){
- const t={id:uid(),title:$("tt").value,location:$("tl").value,user_id:$("tu").value,due_date:$("td").value,points:Number($("tp").value),status:"pending",icon:$("tl").value==="Туалет"?"🚽":$("tl").value==="Мусор"?"🗑":"🧹"};
+ const t={
+   title:$("tt").value,
+   location:$("tl").value,
+   user_id:$("tu").value,
+   due_date:$("td").value,
+   points:Number($("tp").value),
+   status:"pending",
+   icon:$("tl").value==="Туалет"?"🚽":$("tl").value==="Мусор"?"🗑":"🧹",
+   created_by:user.id,
+   assigned_by:user.id
+ };
  if(!t.title)return alert("Введите название");
- if(demo)db.tasks.push(t);else{delete t.id;const r=await sb.from("task_assignments").insert(t);if(r.error)return alert(r.error.message);await load()}
+ if(demo){t.id=uid();db.tasks.push(t);}else{const r=await sb.from("task_assignments").insert(t);if(r.error)return alert(r.error.message);await load()}
  document.querySelector(".modal").remove();render();
 }
+
 function problemModal(){modal(`<h2>🚨 Сообщить о проблеме</h2><label>Название</label><input id="pt" placeholder="Протекает кран"><label>Место</label><select id="pl"><option>Раковина</option><option>Туалет</option><option>Коридор</option><option>Вход</option><option>Другое</option></select><label>Описание</label><textarea id="pd" rows="4"></textarea><button class="btn" style="width:100%" onclick="createProblem()">Отправить</button>`)}
+
 async function createProblem(){
  const p={id:uid(),title:$("pt").value,location:$("pl").value,description:$("pd").value,status:"new",reporter_id:user.id,created_at:new Date().toISOString()};
  if(!p.title)return alert("Введите название");if(demo)db.problems.push(p);else{delete p.id;const r=await sb.from("problems").insert(p);if(r.error)return alert(r.error.message);await load()}
  document.querySelector(".modal").remove();render();
 }
+
 function expenseModal(){modal(`<h2>💰 Новый расход</h2><label>Что купили</label><input id="et" placeholder="Мусорные пакеты"><label>Сумма</label><input id="ea" type="number" min="0" placeholder="1200"><button class="btn" style="width:100%" onclick="createExpense()">Добавить</button>`)}
+
 async function createExpense(){
  const x={id:uid(),title:$("et").value,amount:Number($("ea").value),user_id:user.id,user_name:profile.name,created_at:new Date().toISOString()};
  if(!x.title||!x.amount)return alert("Заполните поля");if(demo)db.expenses.push(x);else{delete x.id;const r=await sb.from("expenses").insert(x);if(r.error)return alert(r.error.message);await load()}
  document.querySelector(".modal").remove();render();
 }
+
 function announcementModal(){modal(`<h2>📢 Новое объявление</h2><label>Заголовок</label><input id="at"><label>Текст</label><textarea id="ab" rows="5"></textarea><button class="btn" style="width:100%" onclick="createAnnouncement()">Опубликовать</button>`)}
+
 async function createAnnouncement(){
  const x={id:uid(),title:$("at").value,body:$("ab").value,author_id:user.id,created_at:new Date().toISOString()};
  if(!x.title)return alert("Введите заголовок");if(demo)db.announcements.push(x);else{delete x.id;const r=await sb.from("announcements").insert(x);if(r.error)return alert(r.error.message);await load()}
  document.querySelector(".modal").remove();render();
 }
+
 init();
 </script>
-</body></html>
+</body>
+</html>
